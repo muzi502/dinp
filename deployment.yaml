@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dinp-deployment
+  namespace: default
+  labels:
+    name: dinp-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: dinp-deployment
+  template:
+    metadata:
+      labels:
+        name: dinp-deployment
+    spec:
+      containers:
+      - name: dind
+        image: docker:20.10.12-dind
+        args: ["--insecure-registry=$(REGISTRY)"]
+        env:
+        - name: REGISTRY
+          value: hub.k8s.li
+        - name: DOCKER_TLS_CERTDIR
+          value: ""
+        - name: DOCKER_HOST
+          value: tcp://localhost:2375
+        securityContext:
+          privileged: true
+        tty: true
+        volumeMounts:
+        - name: docker-storage
+          mountPath:  /var/lib/docker
+        readinessProbe:
+          exec:
+            command: ["docker", "info"]
+          initialDelaySeconds: 10
+          failureThreshold: 6
+        livenessProbe:
+          exec:
+            command: ["docker", "info"]
+          initialDelaySeconds: 60
+          failureThreshold: 10
+      volumes:
+      - name: docker-storage
+        hostPath:
+          path: /var/lib/docker
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: dinp-deployment
+spec:
+  selector:
+    name: dinp-deployment
+  ports:
+  - protocol: TCP
+    port: 2375
+    targetPort: 2375
